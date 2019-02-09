@@ -61,3 +61,30 @@ uint8_t ADNS2610::read(void) {
 uint8_t ADNS2610::get_status(void) {
   return read_register(STATUS);
 }
+
+// ADNS2610 dumps a 324-byte array, make sure buffer is large enough
+// Pixel data byte: [SOF valid? 0-63]
+bool ADNS2610::read_frame(uint8_t * buffer) {
+  // Request frame
+  write_register(PIXEL_DATA, REQ_PIXEL_DATA);
+
+  Timer timer;
+  timer.start();
+
+  unsigned int i = 0;
+  while (i < NUMBER_OF_PIXELS && timer.read_ms() < 1000) {
+    uint8_t pixel = read_register(PIXEL_DATA);
+
+    // Only continue if pixel data is valid
+    if((pixel & 64)) {
+      // Stop if receiving start of frame and we already are past first pixel
+      if ((pixel & 128) && i != 0) {
+        break;
+      }
+      buffer[i] = pixel & 63;
+      i++;
+    }
+  }
+  timer.stop();
+  return (i == NUMBER_OF_PIXELS && timer.read_ms() < 1000);
+}
